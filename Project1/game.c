@@ -49,6 +49,8 @@ int main(void)
 			case 'd':
 				move(1, 0, &player);
 				break;
+			default:
+				break;
 			}
 		}
 	}
@@ -73,7 +75,6 @@ void cursor(int n) // 커서 보이기 & 숨기기
 void move(int x, int y, object * obj)
 {
 	if (obj->x + x < 0 || obj->x + x > N - 1 || obj->y + y < 0 || obj->y + y > N - 1) return;
-	if ()
 	gotoxy(obj->x, obj->y);
 	printf("X");
 	obj->x += x;
