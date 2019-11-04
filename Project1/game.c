@@ -68,8 +68,8 @@ int main(void)
 			}
 		}
 		else {
-			move(0, 1, &player);
 			Sleep(100);
+			move(0, 1, &player);
 		}
 	}
 }
