@@ -17,10 +17,11 @@ int canJump;
 typedef struct {
 	int x, y;
 	char ch;
+	int collision;
 } object;
 
 int player_startPos_X = 0;
-int player_startPos_Y = 0;
+int player_startPos_Y = N - 2;
 
 void gotoxy(int x, int);
 void cursor(int n);
@@ -32,6 +33,7 @@ int isCollideWithMap(int x, int y, object* obj);
 
 int main(void)
 {
+	int time = 0;
 	char key;
 	object player;
 	player.ch = 'P';
@@ -71,8 +73,15 @@ int main(void)
 			}
 		}
 		else {
-			Sleep(50);
-			move(0, 1, &player);
+			if (time % 500 == 0) {
+				gotoxy(0, 0);
+				printf("TIME : %d", time / 500);
+			}
+			if (time % 50 == 0) {
+				move(0, 1, &player);
+			}
+			Sleep(1);
+			time++;
 		}
 	}
 
@@ -95,11 +104,15 @@ void cursor(int n) // 0 : Ä¿¼­ »ç¶óÁü / 1 : Ä¿¼­ »ý±è
 	SetConsoleCursorInfo(hConsole, &ConsoleCursor);
 }
 
-void move(int x, int y, object* obj)
+void move(int x, int y, object * obj)
 {
-	if (isCollideWithMap(x, y, obj)) return;
+	if (isCollideWithMap(x, y, obj)) {
+		return;
+		obj->collision = 1;
+	}
 	if (isCollideWith(WALL, x, y, obj)) {
 		if (y > 0) canJump = 1;
+		obj->collision = 1;
 		return;
 	}
 	if (isCollideWith(WALL, x, y + 1, obj)) {
@@ -119,10 +132,10 @@ void move(int x, int y, object* obj)
 	printf("%c", obj->ch);
 }
 
-void moveN(int x, int y, int n, object* obj)
+void moveN(int x, int y, int n, object * obj)
 {
 	for (int i = 0; i < n; i++) {
-		Sleep(50);
+		//Sleep(50);
 		move(0, -1, obj);
 		canJump = 0;
 	}
@@ -138,7 +151,7 @@ void drawMap(void)
 	}
 }
 
-int isCollideWith(char block, int x, int y, object* obj)
+int isCollideWith(char block, int x, int y, object * obj)
 {
 	if ((map[obj->y + y][obj->x + x] == block)) return 1;
 	else return 0;
