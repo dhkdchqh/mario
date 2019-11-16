@@ -44,11 +44,12 @@ int isCollideWithMap(int x, int y, object* obj);
 void kill(object* obj);
 void kill_all_monsters(void);
 
+void readMapFile(void);
 void init(void);
 void playerControl(void);
 void monsterControl(object* monster);
 void drawTime(void);
-void WriteBuffer(int n, int x, int y, char* ch);
+void writeBuffer(int n, int x, int y, char* ch);
 
 
 int main()
@@ -56,14 +57,13 @@ int main()
 	int time2, cnt = 0;
 	g_hScreen[0] = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
 	g_hScreen[1] = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
+	readMapFile();
 	while (1) {
 		init();
 		while (1)
 		{
-			//drawTime();
 			playerControl();
 			if (time % 10 == 0) {
-				//system("cls");
 				drawMap();
 			}
 			if (time % 20 == 0) {
@@ -80,6 +80,9 @@ int main()
 					cnt++;
 				}
 				if (cnt == 3) {
+					move(0, 0, &player);
+				}
+				if (cnt == 4) {
 					jumping = 0;
 					cnt = 0;
 				}
@@ -117,20 +120,10 @@ void init(void) // 초기 상태
 	monster[0].y = N - 2;
 	monster[0].alive = 1;
 	monster[1].ch = 'M';
-	monster[1].x = 13;
-	monster[1].y = N - 2;
+	monster[1].x = 9;
+	monster[1].y = N - 5;
 	monster[1].alive = 1;
 	time = 0;
-	for (int j = 0; j < 3 * N; j++) {
-		map[N - 1][j] = WALL;
-	}
-	map[N - 2][5] = WALL;
-	map[N - 3][6] = WALL;
-	map[N - 4][7] = WALL;
-	map[N - 4][8] = WALL;
-	map[N - 4][9] = WALL;
-	map[N - 6][10] = WALL;
-	map[N - 3][18] = PORTAL;
 
 	cursor(0);
 	drawMap();
@@ -167,7 +160,7 @@ void playerControl(void) // 플레이어 키 입력 체크
 
 void monsterControl(object* monster) // 몬스터 움직임 제어
 {
-	if (isCollideWith(WALL, monster->direction, 0, monster) || isCollideWithMap(monster->direction, 0, monster)) monster->direction = -monster->direction;
+	if (isCollideWith(WALL, monster->direction, 0, monster) || isCollideWithMap(monster->direction, 0, monster) || map[monster->y+1][monster->x+monster->direction] != WALL) monster->direction = -monster->direction;
 	move(monster->direction, 0, monster);
 }
 
@@ -203,7 +196,7 @@ void move(int x, int y, object* obj) // 움직임 제어. 잡다한 충돌 이벤트도 처리함
 	}
 	if (obj->ch == player.ch && isCollideWith('M', x, y + 1, obj)) {
 		for (int i = 0; i < num_of_monster; i++) {
-			if (isCollideWith(monster[i].ch, x, y+1, obj)) {
+			if (isCollideWith(player.ch, x, -y - 1, &monster[i])) {
 				kill(&monster[i]);
 			}
 		}
@@ -233,17 +226,25 @@ void drawMap(void) // 맵의 내용을 화면에 출력
 	if (start + N)
 		for (int i = 0; i < N; i++) {
 			for (int j = start; j < start + N; j++) {
-				WriteBuffer(screenIndex, 4 * (j - start), 2 * i, &map[i][j]);
-				WriteBuffer(screenIndex, 4 * (j - start) + 1, 2 * i, &map[i][j]);
-				WriteBuffer(screenIndex, 4 * (j - start), 2 * i + 1, &map[i][j]);
-				WriteBuffer(screenIndex, 4 * (j - start) + 1, 2 * i + 1, &map[i][j]);
-				WriteBuffer(screenIndex, 4 * (j - start) + 2, 2 * i, &map[i][j]);
-				WriteBuffer(screenIndex, 4 * (j - start) + 3, 2 * i, &map[i][j]);
-				WriteBuffer(screenIndex, 4 * (j - start) + 2, 2 * i + 1, &map[i][j]);
-				WriteBuffer(screenIndex, 4 * (j - start) + 3, 2 * i + 1, &map[i][j]);
+				//writeBuffer(screenIndex, j - start, i, &map[i][j]);
+				writeBuffer(screenIndex, 4 * (j - start), 2 * i, &map[i][j]);
+				writeBuffer(screenIndex, 4 * (j - start) + 1, 2 * i, &map[i][j]);
+				writeBuffer(screenIndex, 4 * (j - start), 2 * i + 1, &map[i][j]);
+				writeBuffer(screenIndex, 4 * (j - start) + 1, 2 * i + 1, &map[i][j]);
+				writeBuffer(screenIndex, 4 * (j - start) + 2, 2 * i, &map[i][j]);
+				writeBuffer(screenIndex, 4 * (j - start) + 3, 2 * i, &map[i][j]);
+				writeBuffer(screenIndex, 4 * (j - start) + 2, 2 * i + 1, &map[i][j]);
+				writeBuffer(screenIndex, 4 * (j - start) + 3, 2 * i + 1, &map[i][j]);
 			}
 		}
 	SetConsoleActiveScreenBuffer(g_hScreen[screenIndex]);
+}
+
+void mainScreen(void)
+{
+	printf("   ");
+
+
 }
 
 
@@ -278,10 +279,30 @@ void kill_all_monsters(void) // 모든 몬스터 삭제
 	}
 }
 
-void WriteBuffer(int n, int x, int y, char* ch) // 버퍼 내용 입력 함수
+void writeBuffer(int n, int x, int y, char* ch) // 버퍼 내용 입력 함수
 {
 	DWORD dw;
 	COORD CursorPosition = { x, y };
 	SetConsoleCursorPosition(g_hScreen[n], CursorPosition);
 	WriteFile(g_hScreen[n], ch, 1, &dw, NULL);
+}
+
+
+void readMapFile(void)
+{
+	FILE* fp;
+	int tmp;
+	fp = fopen("map.txt", "r");
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < 3 * N; j++) {
+			fscanf(fp, "%d", &tmp);
+			switch (tmp) {
+			case 0: map[i][j] = BACKGROUND; break;
+			case 1: map[i][j] = WALL; break;
+			case 2: map[i][j] = PORTAL; break;
+			case 3: map[i][j] = 'M'; break;
+			}
+		}
+	}
+	fclose(fp);
 }
