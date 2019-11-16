@@ -9,7 +9,6 @@
 #define BACKGROUND ' '
 #define WALL '#'
 #define PORTAL '@'
-#define num_of_monster 10
 
 static HANDLE g_hScreen[2];
 int screenIndex = 0;
@@ -18,6 +17,8 @@ char map[N][3 * N];
 
 int canJump = 0;
 int jumping = 0;
+
+int num_of_monster = 0;
 
 typedef struct {
 	int x, y;
@@ -32,7 +33,7 @@ int player_startPos_Y = N - 2;
 int time;
 char key;
 object player;
-object monster[num_of_monster];
+object monster[100];
 
 void gotoxy(int x, int);
 void cursor(int n);
@@ -57,7 +58,6 @@ int main()
 	int time2, cnt = 0;
 	g_hScreen[0] = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
 	g_hScreen[1] = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
-	readMapFile();
 	while (1) {
 		init();
 		while (1)
@@ -107,22 +107,37 @@ int main()
 void init(void) // 초기 상태
 {
 	kill_all_monsters();
+	num_of_monster = 0;
+	readMapFile();
 	player.ch = 'P';
 	player.x = player_startPos_X;
 	player.y = player_startPos_Y;
 	player.alive = 1;
-	for (int i = 0; i < num_of_monster; i++) {
-		monster[i].alive = 0;
-		monster[i].direction = 1;
+	//for (int i = 0; i < 100; i++) {
+	//	monster[i].alive = 0;
+	//	monster[i].direction = 1;
+	//}
+
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < 3 * N; j++) {
+			if (map[i][j] == 'M') {
+				monster[num_of_monster].ch = 'M';
+				monster[num_of_monster].x = j;
+				monster[num_of_monster].y = i;
+				monster[num_of_monster].alive = 1;
+				monster[num_of_monster].direction = 1;
+				num_of_monster++;
+			}
+		}
 	}
-	monster[0].ch = 'M';
-	monster[0].x = 6;
-	monster[0].y = N - 2;
-	monster[0].alive = 1;
-	monster[1].ch = 'M';
-	monster[1].x = 9;
-	monster[1].y = N - 5;
-	monster[1].alive = 1;
+	//monster[0].ch = 'M';
+	//monster[0].x = 6;
+	//monster[0].y = N - 2;
+	//monster[0].alive = 1;
+	//monster[1].ch = 'M';
+	//monster[1].x = 9;
+	//monster[1].y = N - 5;
+	//monster[1].alive = 1;
 	time = 0;
 
 	cursor(0);
@@ -223,7 +238,6 @@ void drawMap(void) // 맵의 내용을 화면에 출력
 	screenIndex = !screenIndex;
 	if (player.x > N / 2) start = player.x - N / 2;
 	if (player.x > 2 * N + N / 2) start = 2 * N;
-	if (start + N)
 		for (int i = 0; i < N; i++) {
 			for (int j = start; j < start + N; j++) {
 				//writeBuffer(screenIndex, j - start, i, &map[i][j]);
