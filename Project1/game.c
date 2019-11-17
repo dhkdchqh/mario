@@ -25,7 +25,6 @@ int num_of_monster = 0;
 typedef struct {
 	int x, y;
 	char ch;
-	int collision;
 	int alive;
 	int direction;
 } object;
@@ -43,16 +42,21 @@ void move(int x, int y, object* obj);
 void moveN(int x, int y, int n, object* obj);
 void drawMap(void);
 int isCollideWith(char block, int x, int y, object* obj);
-int isCollideWithMap(int x, int y, object* obj);
+int isCollideWithMapX(int x, int y, object* obj);
+int isCollideWithCeiling(int x, int y, object* obj);
+int isCollideWithFloor(int x, int y, object* obj);
 void kill(object* obj);
 void kill_all_monsters(void);
 
 void readMapFile(void);
+void drawMainScreen(void);
 void init(void);
 void playerControl(void);
 void monsterControl(object* monster);
 void drawTime(void);
 void writeBuffer(int n, int x, int y, char* ch);
+void writeBufferString(int n, int x, int y, char* s);
+void clearBuffer(int screenIndex);
 
 
 int main()
@@ -61,6 +65,7 @@ int main()
 	g_hScreen[0] = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
 	g_hScreen[1] = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
 	while (1) {
+		drawMainScreen();
 		init();
 		while (1)
 		{
@@ -69,12 +74,15 @@ int main()
 				drawMap();
 			}
 			if (time % 20 == 0) {
-				if (!jumping) {
+				if (!jumping && !jumping2) {
 					move(0, 1, &player);
 				}
 			}
-			if (jumping) {
+			if (jumping || jumping2) {
 				if (!cnt) {
+					if (jumping2) {
+						cnt += 2;
+					}
 					time2 = time;
 				}
 				if ((time - time2) % 20 == 0) {
@@ -86,6 +94,7 @@ int main()
 				}
 				if (cnt == 5) {
 					jumping = 0;
+					jumping2 = 0;
 					cnt = 0;
 				}
 			}
@@ -108,6 +117,7 @@ int main()
 
 void init(void) // 초기 상태
 {
+	int direction = -1;
 	kill_all_monsters();
 	num_of_monster = 0;
 	readMapFile();
@@ -133,7 +143,8 @@ void init(void) // 초기 상태
 				monster[num_of_monster].x = j;
 				monster[num_of_monster].y = i;
 				monster[num_of_monster].alive = 1;
-				monster[num_of_monster].direction = 1;
+				monster[num_of_monster].direction = direction;
+				direction = -direction;
 				num_of_monster++;
 			}
 			//if (map[i][j] == 'P') {
@@ -189,7 +200,7 @@ void playerControl(void) // 플레이어 키 입력 체크
 
 void monsterControl(object* monster) // 몬스터 움직임 제어
 {
-	if (isCollideWith(WALL, monster->direction, 0, monster) || isCollideWithMap(monster->direction, 0, monster) || map[monster->y+1][monster->x+monster->direction] != WALL) monster->direction = -monster->direction;
+	if (isCollideWith(WALL, monster->direction, 0, monster) || isCollideWithMapX(monster->direction, 0, monster) || map[monster->y + 1][monster->x + monster->direction] != WALL) monster->direction = -monster->direction;
 	move(monster->direction, 0, monster);
 }
 
@@ -209,15 +220,27 @@ void cursor(int n) // 0 : 커서 사라짐 / 1 : 커서 생김
 	SetConsoleCursorInfo(hConsole, &ConsoleCursor);
 }
 
-void move(int x, int y, object* obj) // 움직임 제어. 잡다한 충돌 이벤트도 처리함
+void move(int x, int y, object * obj) // 움직임 제어. 잡다한 충돌 이벤트도 처리함
 {
-	if (isCollideWithMap(x, y, obj)) {
+	if (isCollideWithMapX(x, y, obj)) {
 		return;
-		obj->collision = 1;
+	}
+	if (isCollideWithCeiling(x, y, obj)) {
+		return;
+	}
+	if (isCollideWithFloor(x, y, obj)) {
+		if (obj->ch == player.ch) {
+			kill(&player);
+			return;
+		}
+		if (obj->ch == 'M') {
+			kill(obj);
+			return;
+		}
+		return;
 	}
 	if (isCollideWith(WALL, x, y, obj)) {
 		if (y > 0) canJump = 1;
-		obj->collision = 1;
 		return;
 	}
 	if (isCollideWith(WALL, x, y + 1, obj)) {
@@ -229,7 +252,8 @@ void move(int x, int y, object* obj) // 움직임 제어. 잡다한 충돌 이벤트도 처리함
 				kill(&monster[i]);
 			}
 		}
-		move(0, -1, obj);
+		//move(0, -1, obj);
+		jumping2 = 1;
 		return;
 	}
 	map[obj->y][obj->x] = BACKGROUND;
@@ -252,29 +276,40 @@ void drawMap(void) // 맵의 내용을 화면에 출력
 	screenIndex = !screenIndex;
 	if (player.x > map_size_y / 2) start = player.x - map_size_y / 2;
 	if (player.x > map_size_x - map_size_y / 2) start = map_size_x - map_size_y;
-		for (int i = 0; i < map_size_y; i++) {
-			for (int j = start; j < start + map_size_y; j++) {
-				//writeBuffer(screenIndex, j - start, i, &map[i][j]);
-				writeBuffer(screenIndex, 2 *(j - start), i, &map[i][j]);
-				writeBuffer(screenIndex, 2 * (j - start) + 1, i, &map[i][j]);
-				//writeBuffer(screenIndex, 4 * (j - start), 2 * i, &map[i][j]);
-				//writeBuffer(screenIndex, 4 * (j - start) + 1, 2 * i, &map[i][j]);
-				//writeBuffer(screenIndex, 4 * (j - start), 2 * i + 1, &map[i][j]);
-				//writeBuffer(screenIndex, 4 * (j - start) + 1, 2 * i + 1, &map[i][j]);
-				//writeBuffer(screenIndex, 4 * (j - start) + 2, 2 * i, &map[i][j]);
-				//writeBuffer(screenIndex, 4 * (j - start) + 3, 2 * i, &map[i][j]);
-				//writeBuffer(screenIndex, 4 * (j - start) + 2, 2 * i + 1, &map[i][j]);
-				//writeBuffer(screenIndex, 4 * (j - start) + 3, 2 * i + 1, &map[i][j]);
-			}
+	for (int i = 0; i < map_size_y; i++) {
+		for (int j = start; j < start + map_size_y; j++) {
+			//writeBuffer(screenIndex, j - start, i, &map[i][j]);
+			writeBuffer(screenIndex, 2 * (j - start), i, &map[i][j]);
+			writeBuffer(screenIndex, 2 * (j - start) + 1, i, &map[i][j]);
+			//writeBuffer(screenIndex, 4 * (j - start), 2 * i, &map[i][j]);
+			//writeBuffer(screenIndex, 4 * (j - start) + 1, 2 * i, &map[i][j]);
+			//writeBuffer(screenIndex, 4 * (j - start), 2 * i + 1, &map[i][j]);
+			//writeBuffer(screenIndex, 4 * (j - start) + 1, 2 * i + 1, &map[i][j]);
+			//writeBuffer(screenIndex, 4 * (j - start) + 2, 2 * i, &map[i][j]);
+			//writeBuffer(screenIndex, 4 * (j - start) + 3, 2 * i, &map[i][j]);
+			//writeBuffer(screenIndex, 4 * (j - start) + 2, 2 * i + 1, &map[i][j]);
+			//writeBuffer(screenIndex, 4 * (j - start) + 3, 2 * i + 1, &map[i][j]);
 		}
+	}
 	SetConsoleActiveScreenBuffer(g_hScreen[screenIndex]);
 }
 
-void mainScreen(void)
+void drawMainScreen(void)
 {
-	printf("   ");
-
-
+	char key = ' ';
+	screenIndex = !screenIndex;
+	clearBuffer(screenIndex);
+	writeBufferString(screenIndex, 0, 0, "HELLO THIS IS MAIN SCREEN");
+	writeBufferString(screenIndex, 0, 1, "PRESS R TO START");
+	SetConsoleActiveScreenBuffer(g_hScreen[screenIndex]);
+	while (1) {
+		if (kbhit()) {
+			key = getch();
+			if (key == 'r') {
+				return;
+			}
+		}
+	}
 }
 
 
@@ -290,9 +325,21 @@ int isCollideWith(char block, int x, int y, object * obj) // 다른 오브젝트의 블�
 	else return 0;
 }
 
-int isCollideWithMap(int x, int y, object * obj) // 맵의 가장자리와 충돌했는지 체크
+int isCollideWithMapX(int x, int y, object * obj) // 맵의 가장자리와 충돌했는지 체크
 {
-	if (obj->x + x < 0 || obj->x + x > map_size_x - 1 || obj->y + y < 0 || obj->y + y > map_size_y - 1) return 1;
+	if (obj->x + x < 0 || obj->x + x > map_size_x - 1) return 1;
+	else return 0;
+}
+
+int isCollideWithCeiling(int x, int y, object * obj) // 맵의 꼭대기와 충돌했는지 체크
+{
+	if (obj->y + y < 0) return 1;
+	else return 0;
+}
+
+int isCollideWithFloor(int x, int y, object * obj) // 맵의 꼭대기와 충돌했는지 체크
+{
+	if (obj->y + y > map_size_y - 1) return 1;
 	else return 0;
 }
 
@@ -309,12 +356,30 @@ void kill_all_monsters(void) // 모든 몬스터 삭제
 	}
 }
 
-void writeBuffer(int n, int x, int y, char* ch) // 버퍼 내용 입력 함수
+void writeBuffer(int n, int x, int y, char* ch) // 버퍼 내용 입력 함수 (문자 1개)
 {
 	DWORD dw;
 	COORD CursorPosition = { x, y };
 	SetConsoleCursorPosition(g_hScreen[n], CursorPosition);
 	WriteFile(g_hScreen[n], ch, 1, &dw, NULL);
+}
+
+void writeBufferString(int n, int x, int y, char* s) // 버퍼 내용 입력 함수 (문자열)
+{
+	DWORD dw;
+	COORD CursorPosition = { x, y };
+	SetConsoleCursorPosition(g_hScreen[n], CursorPosition);
+	WriteFile(g_hScreen[n], s, strlen(s), &dw, NULL);
+}
+
+void clearBuffer(int screenIndex)
+{
+	for (int i = 0; i < map_size_y; i++) {
+		for (int j = 0; j < map_size_y; j++) {
+			writeBuffer(screenIndex, 2 * j, i, " ");
+			writeBuffer(screenIndex, 2 * j + 1, i, " ");
+		}
+	}
 }
 
 
@@ -331,7 +396,7 @@ void readMapFile(void)
 			case 1: map[i][j] = WALL; break;
 			case 2: map[i][j] = PORTAL; break;
 			case 3: map[i][j] = 'M'; break;
-			//case 4: map[i][j] = 'p'; break;
+				//case 4: map[i][j] = 'p'; break;
 			}
 		}
 	}
