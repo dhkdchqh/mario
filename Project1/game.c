@@ -5,7 +5,8 @@
 #include <windows.h>
 #pragma warning(disable : 4996)
 
-#define N 10
+#define map_size_y 15
+#define map_size_x 224
 #define BACKGROUND ' '
 #define WALL '#'
 #define PORTAL '@'
@@ -13,10 +14,11 @@
 static HANDLE g_hScreen[2];
 int screenIndex = 0;
 
-char map[N][3 * N];
+char map[map_size_y][map_size_x];
 
 int canJump = 0;
 int jumping = 0;
+int jumping2 = 0;
 
 int num_of_monster = 0;
 
@@ -29,7 +31,7 @@ typedef struct {
 } object;
 
 int player_startPos_X = 0;
-int player_startPos_Y = N - 2;
+int player_startPos_Y = map_size_y - 3;
 int time;
 char key;
 object player;
@@ -79,10 +81,10 @@ int main()
 					move(0, -1, &player);
 					cnt++;
 				}
-				if (cnt == 3) {
+				if (cnt == 4) {
 					move(0, 0, &player);
 				}
-				if (cnt == 4) {
+				if (cnt == 5) {
 					jumping = 0;
 					cnt = 0;
 				}
@@ -109,6 +111,12 @@ void init(void) // 초기 상태
 	kill_all_monsters();
 	num_of_monster = 0;
 	readMapFile();
+	//for (int j = 0; j < map_size_x; j++) {
+	//	if (j % 3 == 2) {
+	//		map[map_size_y - 2][j] = WALL;
+	//	}
+	//	map[map_size_y - 1][j] = WALL;
+	//}
 	player.ch = 'P';
 	player.x = player_startPos_X;
 	player.y = player_startPos_Y;
@@ -118,8 +126,8 @@ void init(void) // 초기 상태
 	//	monster[i].direction = 1;
 	//}
 
-	for (int i = 0; i < N; i++) {
-		for (int j = 0; j < 3 * N; j++) {
+	for (int i = 0; i < map_size_y; i++) {
+		for (int j = 0; j < map_size_x; j++) {
 			if (map[i][j] == 'M') {
 				monster[num_of_monster].ch = 'M';
 				monster[num_of_monster].x = j;
@@ -128,6 +136,12 @@ void init(void) // 초기 상태
 				monster[num_of_monster].direction = 1;
 				num_of_monster++;
 			}
+			//if (map[i][j] == 'P') {
+			//	player.ch = 'P';
+			//	player.x = j;
+			//	player.y = i;
+			//	player.alive = 1;
+			//}
 		}
 	}
 	//monster[0].ch = 'M';
@@ -236,19 +250,21 @@ void drawMap(void) // 맵의 내용을 화면에 출력
 {
 	int start = 0;
 	screenIndex = !screenIndex;
-	if (player.x > N / 2) start = player.x - N / 2;
-	if (player.x > 2 * N + N / 2) start = 2 * N;
-		for (int i = 0; i < N; i++) {
-			for (int j = start; j < start + N; j++) {
+	if (player.x > map_size_y / 2) start = player.x - map_size_y / 2;
+	if (player.x > map_size_x - map_size_y / 2) start = map_size_x - map_size_y;
+		for (int i = 0; i < map_size_y; i++) {
+			for (int j = start; j < start + map_size_y; j++) {
 				//writeBuffer(screenIndex, j - start, i, &map[i][j]);
-				writeBuffer(screenIndex, 4 * (j - start), 2 * i, &map[i][j]);
-				writeBuffer(screenIndex, 4 * (j - start) + 1, 2 * i, &map[i][j]);
-				writeBuffer(screenIndex, 4 * (j - start), 2 * i + 1, &map[i][j]);
-				writeBuffer(screenIndex, 4 * (j - start) + 1, 2 * i + 1, &map[i][j]);
-				writeBuffer(screenIndex, 4 * (j - start) + 2, 2 * i, &map[i][j]);
-				writeBuffer(screenIndex, 4 * (j - start) + 3, 2 * i, &map[i][j]);
-				writeBuffer(screenIndex, 4 * (j - start) + 2, 2 * i + 1, &map[i][j]);
-				writeBuffer(screenIndex, 4 * (j - start) + 3, 2 * i + 1, &map[i][j]);
+				writeBuffer(screenIndex, 2 *(j - start), i, &map[i][j]);
+				writeBuffer(screenIndex, 2 * (j - start) + 1, i, &map[i][j]);
+				//writeBuffer(screenIndex, 4 * (j - start), 2 * i, &map[i][j]);
+				//writeBuffer(screenIndex, 4 * (j - start) + 1, 2 * i, &map[i][j]);
+				//writeBuffer(screenIndex, 4 * (j - start), 2 * i + 1, &map[i][j]);
+				//writeBuffer(screenIndex, 4 * (j - start) + 1, 2 * i + 1, &map[i][j]);
+				//writeBuffer(screenIndex, 4 * (j - start) + 2, 2 * i, &map[i][j]);
+				//writeBuffer(screenIndex, 4 * (j - start) + 3, 2 * i, &map[i][j]);
+				//writeBuffer(screenIndex, 4 * (j - start) + 2, 2 * i + 1, &map[i][j]);
+				//writeBuffer(screenIndex, 4 * (j - start) + 3, 2 * i + 1, &map[i][j]);
 			}
 		}
 	SetConsoleActiveScreenBuffer(g_hScreen[screenIndex]);
@@ -276,7 +292,7 @@ int isCollideWith(char block, int x, int y, object * obj) // 다른 오브젝트의 블�
 
 int isCollideWithMap(int x, int y, object * obj) // 맵의 가장자리와 충돌했는지 체크
 {
-	if (obj->x + x < 0 || obj->x + x > 3 * N - 1 || obj->y + y < 0 || obj->y + y > N - 1) return 1;
+	if (obj->x + x < 0 || obj->x + x > map_size_x - 1 || obj->y + y < 0 || obj->y + y > map_size_y - 1) return 1;
 	else return 0;
 }
 
@@ -307,14 +323,15 @@ void readMapFile(void)
 	FILE* fp;
 	int tmp;
 	fp = fopen("map.txt", "r");
-	for (int i = 0; i < N; i++) {
-		for (int j = 0; j < 3 * N; j++) {
+	for (int i = 0; i < map_size_y; i++) {
+		for (int j = 0; j < map_size_x; j++) {
 			fscanf(fp, "%d", &tmp);
 			switch (tmp) {
 			case 0: map[i][j] = BACKGROUND; break;
 			case 1: map[i][j] = WALL; break;
 			case 2: map[i][j] = PORTAL; break;
 			case 3: map[i][j] = 'M'; break;
+			//case 4: map[i][j] = 'p'; break;
 			}
 		}
 	}
