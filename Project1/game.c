@@ -10,10 +10,12 @@
 #define BACKGROUND ' '
 #define WALL '#'
 #define PORTAL '@'
+#define PIPE 'O'
+#define POLE 'I'
 
 static HANDLE g_hScreen[2];
 int screenIndex = 0;
-
+int map_info[map_size_y][map_size_x];
 char map[map_size_y][map_size_x];
 
 int canJump = 0;
@@ -22,6 +24,9 @@ int jumping2 = 0;
 
 int num_of_monster = 0;
 
+int pipe_out_x;
+int pipe_out_y;
+
 typedef struct {
 	int x, y;
 	char ch;
@@ -29,17 +34,16 @@ typedef struct {
 	int direction;
 } object;
 
-int player_startPos_X = 0;
-int player_startPos_Y = map_size_y - 3;
 int time;
+char timeS[100];
 char key;
+int clear = 0;
 object player;
 object monster[100];
 
 void gotoxy(int x, int);
 void cursor(int n);
 void move(int x, int y, object* obj);
-void moveN(int x, int y, int n, object* obj);
 void drawMap(void);
 int isCollideWith(char block, int x, int y, object* obj);
 int isCollideWithMapX(int x, int y, object* obj);
@@ -50,6 +54,8 @@ void kill_all_monsters(void);
 
 void readMapFile(void);
 void drawMainScreen(void);
+void drawClearScreen(void);
+void drawGameOverScreen(void);
 void init(void);
 void playerControl(void);
 void monsterControl(object* monster);
@@ -62,10 +68,11 @@ void clearBuffer(int screenIndex);
 int main()
 {
 	int time2, cnt = 0;
+	system("mode con cols=30 lines=15");
 	g_hScreen[0] = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
 	g_hScreen[1] = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
+	drawMainScreen();
 	while (1) {
-		drawMainScreen();
 		init();
 		while (1)
 		{
@@ -108,6 +115,12 @@ int main()
 			Sleep(10);
 			time += 10;
 			if (!player.alive) {
+				drawGameOverScreen();
+				break;
+			}
+			if (clear) {
+				clear = 0;
+				drawClearScreen();
 				break;
 			}
 		}
@@ -121,20 +134,6 @@ void init(void) // ÃÊ±â »óÅÂ
 	kill_all_monsters();
 	num_of_monster = 0;
 	readMapFile();
-	//for (int j = 0; j < map_size_x; j++) {
-	//	if (j % 3 == 2) {
-	//		map[map_size_y - 2][j] = WALL;
-	//	}
-	//	map[map_size_y - 1][j] = WALL;
-	//}
-	player.ch = 'P';
-	player.x = player_startPos_X;
-	player.y = player_startPos_Y;
-	player.alive = 1;
-	//for (int i = 0; i < 100; i++) {
-	//	monster[i].alive = 0;
-	//	monster[i].direction = 1;
-	//}
 
 	for (int i = 0; i < map_size_y; i++) {
 		for (int j = 0; j < map_size_x; j++) {
@@ -147,22 +146,15 @@ void init(void) // ÃÊ±â »óÅÂ
 				direction = -direction;
 				num_of_monster++;
 			}
-			//if (map[i][j] == 'P') {
-			//	player.ch = 'P';
-			//	player.x = j;
-			//	player.y = i;
-			//	player.alive = 1;
-			//}
+			else if (map[i][j] == 'P') {
+				player.ch = 'P';
+				player.x = j;
+				player.y = i;
+				player.alive = 1;
+			}
 		}
 	}
-	//monster[0].ch = 'M';
-	//monster[0].x = 6;
-	//monster[0].y = N - 2;
-	//monster[0].alive = 1;
-	//monster[1].ch = 'M';
-	//monster[1].x = 9;
-	//monster[1].y = N - 5;
-	//monster[1].alive = 1;
+
 	time = 0;
 
 	cursor(0);
@@ -192,6 +184,14 @@ void playerControl(void) // ÇÃ·¹ÀÌ¾î Å° ÀÔ·Â Ã¼Å©
 		case 'd':
 			move(1, 0, &player);
 			break;
+		case 's':
+			if (map_info[player.y + 1][player.x] == 6) {
+				map[player.y][player.x] = BACKGROUND;
+				player.y = pipe_out_y - 1;
+				player.x = pipe_out_x;
+				map[player.y][player.x] = player.ch;
+			}
+			break;
 		default:
 			break;
 		}
@@ -200,7 +200,7 @@ void playerControl(void) // ÇÃ·¹ÀÌ¾î Å° ÀÔ·Â Ã¼Å©
 
 void monsterControl(object* monster) // ¸ó½ºÅÍ ¿òÁ÷ÀÓ Á¦¾î
 {
-	if (isCollideWith(WALL, monster->direction, 0, monster) || isCollideWithMapX(monster->direction, 0, monster) || map[monster->y + 1][monster->x + monster->direction] != WALL) monster->direction = -monster->direction;
+	if (isCollideWith(WALL, monster->direction, 0, monster) || isCollideWith(PIPE, monster->direction, 0, monster) || isCollideWithMapX(monster->direction, 0, monster) || map[monster->y + 1][monster->x + monster->direction] != WALL && map[monster->y + 1][monster->x + monster->direction] != PIPE) monster->direction = -monster->direction;
 	move(monster->direction, 0, monster);
 }
 
@@ -239,11 +239,11 @@ void move(int x, int y, object * obj) // ¿òÁ÷ÀÓ Á¦¾î. Àâ´ÙÇÑ Ãæµ¹ ÀÌº¥Æ®µµ Ã³¸®Ç
 		}
 		return;
 	}
-	if (isCollideWith(WALL, x, y, obj)) {
+	if (isCollideWith(WALL, x, y, obj) || isCollideWith(PIPE, x, y, obj)) {
 		if (y > 0) canJump = 1;
 		return;
 	}
-	if (isCollideWith(WALL, x, y + 1, obj)) {
+	if (isCollideWith(WALL, x, y + 1, obj) || isCollideWith(PIPE, x, y + 1, obj)) {
 		canJump = 1;
 	}
 	if (obj->ch == player.ch && isCollideWith('M', x, y + 1, obj)) {
@@ -257,11 +257,11 @@ void move(int x, int y, object * obj) // ¿òÁ÷ÀÓ Á¦¾î. Àâ´ÙÇÑ Ãæµ¹ ÀÌº¥Æ®µµ Ã³¸®Ç
 		return;
 	}
 	map[obj->y][obj->x] = BACKGROUND;
-	if (obj->ch == player.ch && (isCollideWith(PORTAL, x, y, obj) || isCollideWith('M', x, y, obj))) {
-		kill(&player);
+	if (obj->ch == player.ch && isCollideWith(PORTAL, x, y, obj) || obj->ch == player.ch && isCollideWith(POLE, x, y, obj)) {
+		clear = 1;
 		return;
 	}
-	if (obj->ch == 'M' && isCollideWith(player.ch, x, y, obj)) {
+	if (obj->ch == player.ch && isCollideWith('M', x, y, obj) || obj->ch == 'M' && isCollideWith(player.ch, x, y, obj)) {
 		kill(&player);
 		return;
 	}
@@ -273,6 +273,7 @@ void move(int x, int y, object * obj) // ¿òÁ÷ÀÓ Á¦¾î. Àâ´ÙÇÑ Ãæµ¹ ÀÌº¥Æ®µµ Ã³¸®Ç
 void drawMap(void) // ¸ÊÀÇ ³»¿ëÀ» È­¸é¿¡ Ãâ·Â
 {
 	int start = 0;
+	sprintf_s(timeS, 100, "%d", time / 400);
 	screenIndex = !screenIndex;
 	if (player.x > map_size_y / 2) start = player.x - map_size_y / 2;
 	if (player.x > map_size_x - map_size_y / 2) start = map_size_x - map_size_y;
@@ -291,16 +292,18 @@ void drawMap(void) // ¸ÊÀÇ ³»¿ëÀ» È­¸é¿¡ Ãâ·Â
 			//writeBuffer(screenIndex, 4 * (j - start) + 3, 2 * i + 1, &map[i][j]);
 		}
 	}
+	writeBufferString(screenIndex, 0, 0, "TIME = ");
+	writeBufferString(screenIndex, 7, 0, timeS);
 	SetConsoleActiveScreenBuffer(g_hScreen[screenIndex]);
 }
 
-void drawMainScreen(void)
+void drawMainScreen(void) // ¸ÞÀÎ(½ÃÀÛ) È­¸é
 {
-	char key = ' ';
+	char key;
 	screenIndex = !screenIndex;
 	clearBuffer(screenIndex);
-	writeBufferString(screenIndex, 0, 0, "HELLO THIS IS MAIN SCREEN");
-	writeBufferString(screenIndex, 0, 1, "PRESS R TO START");
+	writeBufferString(screenIndex, 0, 0, "WELCOME TO CONSOLE MARIO");
+	writeBufferString(screenIndex, 0, 1, "PRESS R TO START, E TO EXIT");
 	SetConsoleActiveScreenBuffer(g_hScreen[screenIndex]);
 	while (1) {
 		if (kbhit()) {
@@ -308,16 +311,57 @@ void drawMainScreen(void)
 			if (key == 'r') {
 				return;
 			}
+			else if (key == 'e') {
+				exit(0);
+			}
 		}
 	}
 }
 
-
-void drawTime(void)
+void drawClearScreen(void) // °ÔÀÓ Å¬¸®¾î½Ã È­¸é
 {
-	gotoxy(0, 0);
-	printf("TIME : %d", time / 100);
+	char key;
+	screenIndex = !screenIndex;
+	clearBuffer(screenIndex);
+	writeBufferString(screenIndex, 0, 0, "GAME CLEAR!!!");
+	writeBufferString(screenIndex, 0, 1, "CLEAR TIME = ");
+	writeBufferString(screenIndex, 13, 1, timeS);
+	writeBufferString(screenIndex, 0, 2, "PRESS R TO RESTART, E TO EXIT");
+	SetConsoleActiveScreenBuffer(g_hScreen[screenIndex]);
+	while (1) {
+		if (kbhit()) {
+			key = getch();
+			if (key == 'r') {
+				return;
+			}
+			else if (key == 'e') {
+				exit(0);
+			}
+		}
+	}
 }
+
+void drawGameOverScreen(void) // ÇÃ·¹ÀÌ¾î »ç¸Á½Ã È­¸é
+{
+	char key = ' ';
+	screenIndex = !screenIndex;
+	clearBuffer(screenIndex);
+	writeBufferString(screenIndex, 0, 0, "GAME OVER...");
+	writeBufferString(screenIndex, 0, 1, "PRESS R TO RESTART, E TO EXIT");
+	SetConsoleActiveScreenBuffer(g_hScreen[screenIndex]);
+	while (1) {
+		if (kbhit()) {
+			key = getch();
+			if (key == 'r') {
+				return;
+			}
+			else if (key == 'e') {
+				exit(0);
+			}
+		}
+	}
+}
+
 
 int isCollideWith(char block, int x, int y, object * obj) // ´Ù¸¥ ¿ÀºêÁ§Æ®ÀÇ ºí·Ï°ú Ãæµ¹Çß´ÂÁö Ã¼Å©
 {
@@ -372,7 +416,7 @@ void writeBufferString(int n, int x, int y, char* s) // ¹öÆÛ ³»¿ë ÀÔ·Â ÇÔ¼ö (¹®À
 	WriteFile(g_hScreen[n], s, strlen(s), &dw, NULL);
 }
 
-void clearBuffer(int screenIndex)
+void clearBuffer(int screenIndex) // ¹öÆÛ ³»¿ëÀ» Áö¿öÁÜ
 {
 	for (int i = 0; i < map_size_y; i++) {
 		for (int j = 0; j < map_size_y; j++) {
@@ -383,20 +427,28 @@ void clearBuffer(int screenIndex)
 }
 
 
-void readMapFile(void)
+void readMapFile(void) // txt ÆÄÀÏ¿¡¼­ ¸Ê Á¤º¸¸¦ ºÒ·¯¿È
 {
 	FILE* fp;
-	int tmp;
 	fp = fopen("map.txt", "r");
 	for (int i = 0; i < map_size_y; i++) {
 		for (int j = 0; j < map_size_x; j++) {
-			fscanf(fp, "%d", &tmp);
-			switch (tmp) {
+			fscanf(fp, "%d", &map_info[i][j]);
+			switch (map_info[i][j]) {
 			case 0: map[i][j] = BACKGROUND; break;
 			case 1: map[i][j] = WALL; break;
 			case 2: map[i][j] = PORTAL; break;
 			case 3: map[i][j] = 'M'; break;
-				//case 4: map[i][j] = 'p'; break;
+			case 4: map[i][j] = 'P'; break;
+			case 5: map[i][j] = PIPE; break;
+			case 6: map[i][j] = PIPE; break;
+			case 7: 
+				map[i][j] = PIPE;
+				pipe_out_x = j;
+				pipe_out_y = i;
+				break;
+			case 8: map[i][j] = POLE; break;
+			default: map[i][j] = BACKGROUND; break;
 			}
 		}
 	}
