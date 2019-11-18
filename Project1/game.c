@@ -38,6 +38,7 @@ int time;
 char timeS[100];
 char key;
 int clear = 0;
+int restart = 0;
 object player;
 object monster[100];
 
@@ -71,8 +72,13 @@ int main()
 	system("mode con cols=30 lines=15");
 	g_hScreen[0] = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
 	g_hScreen[1] = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
-	drawMainScreen();
 	while (1) {
+		if (restart) {
+			restart = 0;
+		}
+		else {
+			drawMainScreen();
+		}
 		init();
 		while (1)
 		{
@@ -326,16 +332,13 @@ void drawClearScreen(void) // 게임 클리어시 화면
 	writeBufferString(screenIndex, 0, 0, "GAME CLEAR!!!");
 	writeBufferString(screenIndex, 0, 1, "CLEAR TIME = ");
 	writeBufferString(screenIndex, 13, 1, timeS);
-	writeBufferString(screenIndex, 0, 2, "PRESS R TO RESTART, E TO EXIT");
+	writeBufferString(screenIndex, 0, 2, "PRESS R TO GO TO MAIN SCREEN");
 	SetConsoleActiveScreenBuffer(g_hScreen[screenIndex]);
 	while (1) {
 		if (kbhit()) {
 			key = getch();
 			if (key == 'r') {
 				return;
-			}
-			else if (key == 'e') {
-				exit(0);
 			}
 		}
 	}
@@ -347,16 +350,18 @@ void drawGameOverScreen(void) // 플레이어 사망시 화면
 	screenIndex = !screenIndex;
 	clearBuffer(screenIndex);
 	writeBufferString(screenIndex, 0, 0, "GAME OVER...");
-	writeBufferString(screenIndex, 0, 1, "PRESS R TO RESTART, E TO EXIT");
+	writeBufferString(screenIndex, 0, 1, "PRESS R TO RESTART, ");
+	writeBufferString(screenIndex, 0, 2, " E TO GO TO MAIN SCREEN");
 	SetConsoleActiveScreenBuffer(g_hScreen[screenIndex]);
 	while (1) {
 		if (kbhit()) {
 			key = getch();
 			if (key == 'r') {
+				restart = 1;
 				return;
 			}
 			else if (key == 'e') {
-				exit(0);
+				return;
 			}
 		}
 	}
