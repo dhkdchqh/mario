@@ -6,12 +6,13 @@
 #pragma warning(disable : 4996)
 
 #define map_size_y 15
-#define map_size_x 224
+#define map_size_x 244
 #define BACKGROUND ' '
 #define WALL '#'
 #define PORTAL '@'
 #define PIPE 'O'
 #define POLE 'I'
+#define COIN 'C'
 
 static HANDLE g_hScreen[2];
 int screenIndex = 0;
@@ -27,6 +28,11 @@ int num_of_monster = 0;
 int pipe_out_x;
 int pipe_out_y;
 
+int stage_in_x;
+int stage_in_y;
+int stage_out_x;
+int stage_out_y;
+
 typedef struct {
 	int x, y;
 	char ch;
@@ -38,7 +44,6 @@ int time;
 char timeS[100];
 char key;
 int clear = 0;
-int restart = 0;
 object player;
 object monster[100];
 
@@ -72,13 +77,8 @@ int main()
 	system("mode con cols=30 lines=15");
 	g_hScreen[0] = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
 	g_hScreen[1] = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
+	drawMainScreen();
 	while (1) {
-		if (restart) {
-			restart = 0;
-		}
-		else {
-			drawMainScreen();
-		}
 		init();
 		while (1)
 		{
@@ -193,6 +193,12 @@ void playerControl(void) // 플레이어 키 입력 체크
 		case 's':
 			if (map_info[player.y + 1][player.x] == 6) {
 				map[player.y][player.x] = BACKGROUND;
+				player.y = stage_in_y;
+				player.x = stage_in_x;
+				map[player.y][player.x] = player.ch;
+			}
+			else if (map_info[player.y + 1][player.x] == -9) {
+				map[player.y][player.x] = BACKGROUND;
 				player.y = pipe_out_y - 1;
 				player.x = pipe_out_x;
 				map[player.y][player.x] = player.ch;
@@ -282,7 +288,7 @@ void drawMap(void) // 맵의 내용을 화면에 출력
 	sprintf_s(timeS, 100, "%d", time / 400);
 	screenIndex = !screenIndex;
 	if (player.x > map_size_y / 2) start = player.x - map_size_y / 2;
-	if (player.x > map_size_x - map_size_y / 2) start = map_size_x - map_size_y;
+	if (player.x >= map_size_x - map_size_y / 2) start = map_size_x - map_size_y;
 	for (int i = 0; i < map_size_y; i++) {
 		for (int j = start; j < start + map_size_y; j++) {
 			//writeBuffer(screenIndex, j - start, i, &map[i][j]);
@@ -332,13 +338,16 @@ void drawClearScreen(void) // 게임 클리어시 화면
 	writeBufferString(screenIndex, 0, 0, "GAME CLEAR!!!");
 	writeBufferString(screenIndex, 0, 1, "CLEAR TIME = ");
 	writeBufferString(screenIndex, 13, 1, timeS);
-	writeBufferString(screenIndex, 0, 2, "PRESS R TO GO TO MAIN SCREEN");
+	writeBufferString(screenIndex, 0, 2, "PRESS R TO RESTART, E TO EXIT");
 	SetConsoleActiveScreenBuffer(g_hScreen[screenIndex]);
 	while (1) {
 		if (kbhit()) {
 			key = getch();
 			if (key == 'r') {
 				return;
+			}
+			else if (key == 'e') {
+				exit(0);
 			}
 		}
 	}
@@ -350,18 +359,16 @@ void drawGameOverScreen(void) // 플레이어 사망시 화면
 	screenIndex = !screenIndex;
 	clearBuffer(screenIndex);
 	writeBufferString(screenIndex, 0, 0, "GAME OVER...");
-	writeBufferString(screenIndex, 0, 1, "PRESS R TO RESTART, ");
-	writeBufferString(screenIndex, 0, 2, " E TO GO TO MAIN SCREEN");
+	writeBufferString(screenIndex, 0, 1, "PRESS R TO RESTART, E TO EXIT");
 	SetConsoleActiveScreenBuffer(g_hScreen[screenIndex]);
 	while (1) {
 		if (kbhit()) {
 			key = getch();
 			if (key == 'r') {
-				restart = 1;
 				return;
 			}
 			else if (key == 'e') {
-				return;
+				exit(0);
 			}
 		}
 	}
@@ -447,12 +454,25 @@ void readMapFile(void) // txt 파일에서 맵 정보를 불러옴
 			case 4: map[i][j] = 'P'; break;
 			case 5: map[i][j] = PIPE; break;
 			case 6: map[i][j] = PIPE; break;
-			case 7: 
+			case 7:
 				map[i][j] = PIPE;
 				pipe_out_x = j;
 				pipe_out_y = i;
 				break;
 			case 8: map[i][j] = POLE; break;
+			case 9:
+				map[i][j] = BACKGROUND;
+				stage_in_x = j;
+				stage_in_y = i;
+				break;
+			case -9:
+				map[i][j] = PIPE;
+				stage_out_x = j;
+				stage_out_y = i;
+				break;
+			case -8:
+				map[i][j] = COIN;
+				break;
 			default: map[i][j] = BACKGROUND; break;
 			}
 		}
